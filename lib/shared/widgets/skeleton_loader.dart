@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import '../../core/theme/app_colors.dart';
+
+import '../../core/theme/theme_extensions.dart';
 
 class SkeletonLoader extends StatefulWidget {
   const SkeletonLoader({
@@ -38,6 +39,8 @@ class _SkeletonLoaderState extends State<SkeletonLoader>
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
+
     return AnimatedBuilder(
       animation: _controller,
       builder: (context, child) {
@@ -50,13 +53,13 @@ class _SkeletonLoaderState extends State<SkeletonLoader>
               begin: Alignment.centerLeft,
               end: Alignment.centerRight,
               colors: [
-                AppColors.shimmerBase,
+                colors.shimmerBase,
                 Color.lerp(
-                  AppColors.shimmerBase,
-                  AppColors.shimmerHighlight,
+                  colors.shimmerBase,
+                  colors.shimmerHighlight,
                   _controller.value,
                 )!,
-                AppColors.shimmerBase,
+                colors.shimmerBase,
               ],
             ),
           ),

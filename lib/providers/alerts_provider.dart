@@ -1,10 +1,17 @@
+import 'dart:async';
+import 'dart:convert';
+
 import 'package:flutter/foundation.dart';
 
 import '../core/services/alarm_service.dart';
 import '../core/services/background_monitor_service.dart';
+import '../core/services/custom_sound_service.dart';
 import '../core/services/notification_service.dart';
 import '../core/services/preferences_service.dart';
+import '../core/utils/battery_health_score.dart';
 import '../core/utils/battery_status_helper.dart';
+import '../database/sqlite/alert_event_model.dart';
+import '../database/sqlite/database_helper.dart';
 import '../features/battery/models/battery_info.dart';
 
 enum AlertType {
@@ -13,6 +20,9 @@ enum AlertType {
   chargerConnected,
   chargerDisconnected,
   chargerReconnected,
+  lowBattery,
+  fullCharge,
+  overcharge,
 }
 
 class AlertRecord {
@@ -35,22 +45,32 @@ class AlertsProvider extends ChangeNotifier {
     required NotificationService notificationService,
     required AlarmService alarmService,
     BackgroundMonitorService? backgroundMonitorService,
+    DatabaseHelper? databaseHelper,
   })  : _preferences = preferences,
         _notificationService = notificationService,
         _alarmService = alarmService,
-        _backgroundMonitor = backgroundMonitorService ?? BackgroundMonitorService();
+        _backgroundMonitor = backgroundMonitorService ?? BackgroundMonitorService(),
+        _db = databaseHelper ?? DatabaseHelper.instance;
 
   final PreferencesService _preferences;
   final NotificationService _notificationService;
   final AlarmService _alarmService;
   final BackgroundMonitorService _backgroundMonitor;
+  final DatabaseHelper _db;
+
+  static const _maxHistory = 100;
 
   final List<AlertRecord> _history = [];
   bool _levelAlertTriggered = false;
   bool _tempAlertTriggered = false;
+  bool _lowBatteryTriggered = false;
+  bool _fullChargeTriggered = false;
+  bool _overchargeTriggered = false;
+  DateTime? _highLevelSince;
   bool _alarmActive = false;
   String? _activeAlertMessage;
   bool _backgroundHandlesAlerts = false;
+  DateTime? _backgroundStateCheckedAt;
 
   List<AlertRecord> get history => List.unmodifiable(_history);
   bool get alarmActive => _alarmActive;
@@ -59,9 +79,97 @@ class AlertsProvider extends ChangeNotifier {
   void initialize() {
     _notificationService.onStopAlarmTapped = (_) => stopAlarm();
     _refreshBackgroundState();
+    loadHistory();
+    syncNativeEvents();
   }
 
-  Future<void> _refreshBackgroundState() async {
+  Future<void> loadHistory() async {
+    try {
+      final events = await _db.getRecentAlertEvents(limit: _maxHistory);
+      _history
+        ..clear()
+        ..addAll(events.map((e) => e.toRecord()));
+      notifyListeners();
+    } catch (_) {
+      // Keep in-memory history if DB is unavailable.
+    }
+  }
+
+  Future<void> syncNativeEvents() async {
+    try {
+      final raw = await _backgroundMonitor.drainNativeAlertEvents();
+      final list = jsonDecode(raw) as List<dynamic>;
+      if (list.isEmpty) return;
+
+      var changed = false;
+      for (final item in list) {
+        final map = item as Map<String, dynamic>;
+        final typeIndex = map['type'] as int;
+        if (typeIndex < 0 || typeIndex >= AlertType.values.length) continue;
+
+        final record = AlertRecord(
+          type: AlertType.values[typeIndex],
+          message: map['message'] as String,
+          level: map['level'] as int,
+          timestamp: DateTime.fromMillisecondsSinceEpoch(
+            map['timestamp'] as int,
+          ),
+        );
+
+        if (_hasSimilarRecord(record)) continue;
+
+        await _db.insertAlertEvent(AlertEventModel.fromRecord(record));
+        _history.insert(0, record);
+        changed = true;
+      }
+
+      while (_history.length > _maxHistory) {
+        _history.removeLast();
+      }
+
+      if (changed) notifyListeners();
+    } catch (_) {
+      // Native queue unavailable on this platform.
+    }
+  }
+
+  bool _hasSimilarRecord(AlertRecord record) {
+    return _history.any(
+      (existing) =>
+          existing.type == record.type &&
+          existing.message == record.message &&
+          existing.level == record.level &&
+          existing.timestamp
+                  .difference(record.timestamp)
+                  .inSeconds
+                  .abs() <
+              30,
+    );
+  }
+
+  Future<void> _persistRecord(AlertRecord record) async {
+    _history.insert(0, record);
+    while (_history.length > _maxHistory) {
+      _history.removeLast();
+    }
+    try {
+      await _db.insertAlertEvent(AlertEventModel.fromRecord(record));
+    } catch (_) {
+      // History remains in memory.
+    }
+    notifyListeners();
+  }
+
+  Future<void> _refreshBackgroundState({bool force = false}) async {
+    final now = DateTime.now();
+    if (!force &&
+        _backgroundStateCheckedAt != null &&
+        now.difference(_backgroundStateCheckedAt!) <
+            const Duration(seconds: 30)) {
+      return;
+    }
+
+    _backgroundStateCheckedAt = now;
     _backgroundHandlesAlerts =
         _preferences.backgroundMonitoringEnabled &&
         await _backgroundMonitor.isRunning();
@@ -74,10 +182,15 @@ class AlertsProvider extends ChangeNotifier {
       _resetLevelTriggers();
     }
 
-    if (_backgroundHandlesAlerts) return;
+    if (_backgroundHandlesAlerts) {
+      return;
+    }
 
     await _checkLevelAlert(info);
     await _checkTemperatureAlert(info);
+    await _checkLowBatteryAlert(info);
+    await _checkFullChargeAlert(info);
+    await _checkOverchargeAlert(info);
   }
 
   Future<void> _checkLevelAlert(BatteryInfo info) async {
@@ -119,19 +232,119 @@ class AlertsProvider extends ChangeNotifier {
     required String message,
     required int level,
   }) {
-    _history.insert(
-      0,
+    if (_backgroundHandlesAlerts) return;
+
+    final record = AlertRecord(
+      type: type,
+      message: message,
+      timestamp: DateTime.now(),
+      level: level,
+    );
+    if (_hasSimilarRecord(record)) return;
+    unawaited(_persistRecord(record));
+  }
+
+  Future<void> _checkLowBatteryAlert(BatteryInfo info) async {
+    if (!_preferences.lowBatteryAlertEnabled) return;
+    if (BatteryStatusHelper.isPluggedIn(info.state)) {
+      _lowBatteryTriggered = false;
+      return;
+    }
+
+    if (info.level <= 0) return;
+
+    final threshold = _preferences.lowBatteryLevel;
+    if (info.level <= threshold && !_lowBatteryTriggered) {
+      _lowBatteryTriggered = true;
+      await _triggerAlert(
+        type: AlertType.lowBattery,
+        title: 'Batería baja',
+        body:
+            'Queda ${info.level}% de batería. Conecta el cargador pronto.',
+        level: info.level,
+      );
+    } else if (info.level > threshold + 5) {
+      _lowBatteryTriggered = false;
+    }
+  }
+
+  Future<void> _checkFullChargeAlert(BatteryInfo info) async {
+    if (!_preferences.fullChargeAlertEnabled) return;
+
+    if (!BatteryStatusHelper.isPluggedIn(info.state)) {
+      _fullChargeTriggered = false;
+      return;
+    }
+
+    if (info.level >= 100 && !_fullChargeTriggered) {
+      _fullChargeTriggered = true;
+      await _triggerNotification(
+        type: AlertType.fullCharge,
+        title: 'Carga completa',
+        body: 'La batería llegó al 100%. Puedes desconectar el cargador.',
+        level: info.level,
+      );
+    }
+  }
+
+  Future<void> _checkOverchargeAlert(BatteryInfo info) async {
+    if (!_preferences.overchargeAlertEnabled) return;
+
+    if (!BatteryStatusHelper.isPluggedIn(info.state)) {
+      _highLevelSince = null;
+      _overchargeTriggered = false;
+      return;
+    }
+
+    if (info.level >= 95) {
+      _highLevelSince ??= DateTime.now();
+      final pluggedMinutes =
+          DateTime.now().difference(_highLevelSince!).inMinutes;
+      if (pluggedMinutes >= 30 && !_overchargeTriggered) {
+        _overchargeTriggered = true;
+        await _triggerNotification(
+          type: AlertType.overcharge,
+          title: 'Carga prolongada',
+          body:
+              'Llevas $pluggedMinutes min conectado al ${info.level}%. Desconecta para cuidar la batería.',
+          level: info.level,
+        );
+      }
+    } else {
+      _highLevelSince = null;
+      _overchargeTriggered = false;
+    }
+  }
+
+  Future<void> testAlarm() async {
+    await _alarmService.preview(
+      soundPath: _soundPath(),
+      soundEnabled: _preferences.soundEnabled,
+      vibrationEnabled: _preferences.vibrationEnabled,
+    );
+  }
+
+  Future<void> _triggerNotification({
+    required AlertType type,
+    required String title,
+    required String body,
+    required int level,
+  }) async {
+    await _persistRecord(
       AlertRecord(
         type: type,
-        message: message,
+        message: body,
         timestamp: DateTime.now(),
         level: level,
       ),
     );
-    if (_history.length > 50) {
-      _history.removeLast();
-    }
-    notifyListeners();
+
+    await _notificationService.showBatteryAlert(
+      id: type.index + 100,
+      title: title,
+      body: body,
+      ongoing: false,
+    );
   }
 
   Future<void> _triggerAlert({
@@ -143,8 +356,7 @@ class AlertsProvider extends ChangeNotifier {
     _activeAlertMessage = body;
     _alarmActive = true;
 
-    _history.insert(
-      0,
+    await _persistRecord(
       AlertRecord(
         type: type,
         message: body,
@@ -152,9 +364,6 @@ class AlertsProvider extends ChangeNotifier {
         level: level,
       ),
     );
-    if (_history.length > 50) {
-      _history.removeLast();
-    }
 
     await _notificationService.showBatteryAlert(
       id: type.index,
@@ -163,21 +372,25 @@ class AlertsProvider extends ChangeNotifier {
       ongoing: true,
     );
 
-    await _alarmService.start(
-      soundEnabled: _preferences.soundEnabled,
-      vibrationEnabled: _preferences.vibrationEnabled,
-      soundAsset: _soundAssetPath(),
+    final quiet = QuietHoursHelper.isActive(
+      enabled: _preferences.quietHoursEnabled,
+      startHour: _preferences.quietHoursStart,
+      endHour: _preferences.quietHoursEnd,
     );
 
-    notifyListeners();
+    await _alarmService.start(
+      soundEnabled: _preferences.soundEnabled && !quiet,
+      vibrationEnabled: _preferences.vibrationEnabled && !quiet,
+      soundPath: _soundPath(),
+    );
   }
 
-  String _soundAssetPath() {
+  String _soundPath() {
     final path = _preferences.customSound;
-    if (path.startsWith('assets/')) {
-      return path.replaceFirst('assets/', '');
+    if (path.startsWith('assets/') || CustomSoundService.isLocalPath(path)) {
+      return path;
     }
-    return 'sounds/alarm.wav';
+    return 'assets/sounds/alarm.wav';
   }
 
   Future<void> stopAlarm() async {
@@ -193,8 +406,13 @@ class AlertsProvider extends ChangeNotifier {
     _levelAlertTriggered = false;
   }
 
-  void clearHistory() {
+  Future<void> clearHistory() async {
     _history.clear();
+    try {
+      await _db.deleteAllAlertEvents();
+    } catch (_) {
+      // Cleared in memory only.
+    }
     notifyListeners();
   }
 

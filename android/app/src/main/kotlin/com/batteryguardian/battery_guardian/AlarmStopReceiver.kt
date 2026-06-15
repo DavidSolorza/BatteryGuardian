@@ -9,7 +9,6 @@ class AlarmStopReceiver : BroadcastReceiver() {
         if (intent?.action != ACTION_STOP_ALARM) return
         AlarmHelper.stop()
         NotificationHelper.cancelAlarmNotification(context)
-        PrefsHelper.setLevelAlertTriggered(context, true)
     }
 
     companion object {

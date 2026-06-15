@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import '../../core/theme/app_colors.dart';
-import '../../core/theme/app_text_styles.dart';
+
+import '../../core/theme/theme_extensions.dart';
 
 class ErrorState extends StatelessWidget {
   const ErrorState({
@@ -14,30 +14,30 @@ class ErrorState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
+    final textStyles = context.textStyles;
+
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(32),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.error_outline, size: 48, color: AppColors.critical),
+            Icon(Icons.error_outline, size: 48, color: colors.critical),
             const SizedBox(height: 16),
-            Text(
-              'Algo salió mal',
-              style: AppTextStyles.titleLarge,
-            ),
+            Text('Algo salió mal', style: textStyles.titleLarge),
             const SizedBox(height: 8),
-            Text(message, style: AppTextStyles.bodyMedium, textAlign: TextAlign.center),
+            Text(
+              message,
+              style: textStyles.bodyMedium,
+              textAlign: TextAlign.center,
+            ),
             if (onRetry != null) ...[
               const SizedBox(height: 24),
               FilledButton.icon(
                 onPressed: onRetry,
                 icon: const Icon(Icons.refresh),
                 label: const Text('Reintentar'),
-                style: FilledButton.styleFrom(
-                  backgroundColor: AppColors.primary,
-                  foregroundColor: AppColors.background,
-                ),
               ),
             ],
           ],

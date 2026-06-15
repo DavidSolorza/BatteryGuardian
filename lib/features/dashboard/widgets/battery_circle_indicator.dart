@@ -1,8 +1,9 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
-import '../../../core/theme/app_colors.dart';
-import '../../../core/theme/app_text_styles.dart';
+
+import '../../../core/theme/theme_extensions.dart';
+import '../../../core/utils/responsive.dart';
 
 class BatteryCircleIndicator extends StatefulWidget {
   const BatteryCircleIndicator({
@@ -22,7 +23,6 @@ class _BatteryCircleIndicatorState extends State<BatteryCircleIndicator>
     with SingleTickerProviderStateMixin {
   late AnimationController _controller;
   late Animation<double> _animation;
-  int _displayLevel = 0;
 
   @override
   void initState() {
@@ -33,9 +33,7 @@ class _BatteryCircleIndicatorState extends State<BatteryCircleIndicator>
     );
     _animation = Tween<double>(begin: 0, end: widget.level.toDouble()).animate(
       CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic),
-    )..addListener(() {
-        setState(() => _displayLevel = _animation.value.round());
-      });
+    );
     _controller.forward();
   }
 
@@ -44,7 +42,7 @@ class _BatteryCircleIndicatorState extends State<BatteryCircleIndicator>
     super.didUpdateWidget(oldWidget);
     if (oldWidget.level != widget.level) {
       _animation = Tween<double>(
-        begin: _displayLevel.toDouble(),
+        begin: _animation.value,
         end: widget.level.toDouble(),
       ).animate(
         CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic),
@@ -63,52 +61,61 @@ class _BatteryCircleIndicatorState extends State<BatteryCircleIndicator>
 
   @override
   Widget build(BuildContext context) {
-    final size = MediaQuery.sizeOf(context).width * 0.55;
-    final clampedSize = size.clamp(180.0, 260.0);
+    final size = Responsive.batteryIndicatorSize(context).clamp(180.0, 300.0);
+    final textStyles = context.textStyles;
 
-    return SizedBox(
-      width: clampedSize,
-      height: clampedSize,
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-          CustomPaint(
-            size: Size(clampedSize, clampedSize),
-            painter: _CirclePainter(
-              progress: _displayLevel / 100,
-              color: widget.statusColor,
-            ),
-          ),
-          Column(
-            mainAxisSize: MainAxisSize.min,
+    return AnimatedBuilder(
+      animation: _animation,
+      builder: (context, child) {
+        final displayLevel = _animation.value.round();
+        return SizedBox(
+          width: size,
+          height: size,
+          child: Stack(
+            alignment: Alignment.center,
             children: [
-              Text(
-                '$_displayLevel',
-                style: AppTextStyles.displayLarge.copyWith(
+              CustomPaint(
+                size: Size(size, size),
+                painter: _CirclePainter(
+                  progress: displayLevel / 100,
                   color: widget.statusColor,
-                  fontSize: clampedSize * 0.22,
+                  trackColor: context.appColors.cardElevated,
                 ),
               ),
-              Text(
-                '%',
-                style: AppTextStyles.bodyMedium.copyWith(
-                  color: AppColors.textSecondary,
-                  fontSize: 18,
-                ),
+              Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    '$displayLevel',
+                    style: textStyles.displayLarge.copyWith(
+                      color: widget.statusColor,
+                      fontSize: size * 0.22,
+                    ),
+                  ),
+                  Text(
+                    '%',
+                    style: textStyles.bodyMedium.copyWith(fontSize: 18),
+                  ),
+                ],
               ),
             ],
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 }
 
 class _CirclePainter extends CustomPainter {
-  _CirclePainter({required this.progress, required this.color});
+  _CirclePainter({
+    required this.progress,
+    required this.color,
+    required this.trackColor,
+  });
 
   final double progress;
   final Color color;
+  final Color trackColor;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -117,7 +124,7 @@ class _CirclePainter extends CustomPainter {
     const strokeWidth = 14.0;
 
     final bgPaint = Paint()
-      ..color = AppColors.cardElevated
+      ..color = trackColor
       ..style = PaintingStyle.stroke
       ..strokeWidth = strokeWidth
       ..strokeCap = StrokeCap.round;
@@ -145,6 +152,8 @@ class _CirclePainter extends CustomPainter {
 
   @override
   bool shouldRepaint(_CirclePainter oldDelegate) {
-    return oldDelegate.progress != progress || oldDelegate.color != color;
+    return oldDelegate.progress != progress ||
+        oldDelegate.color != color ||
+        oldDelegate.trackColor != trackColor;
   }
 }

@@ -43,6 +43,15 @@ class MainActivity : FlutterActivity() {
                         NotificationHelper.cancelAlarmNotification(this)
                         result.success(true)
                     }
+                    "ensureBackgroundMonitoring" -> {
+                        if (PrefsHelper.isBackgroundMonitoringEnabled(this)) {
+                            ServiceWatchdog.ensureServiceRunning(this)
+                        }
+                        result.success(BatteryMonitorService.isRunning(this))
+                    }
+                    "drainNativeAlertEvents" -> {
+                        result.success(EventLogger.drainPending(this))
+                    }
                     else -> result.notImplemented()
                 }
             }

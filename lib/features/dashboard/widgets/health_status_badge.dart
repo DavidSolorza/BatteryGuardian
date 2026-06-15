@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
+
 import '../../../core/theme/app_colors.dart';
-import '../../../core/theme/app_text_styles.dart';
+import '../../../core/theme/theme_extensions.dart';
 import '../../../core/utils/battery_status_helper.dart';
 
 class HealthStatusBadge extends StatelessWidget {
@@ -14,6 +15,7 @@ class HealthStatusBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final color = AppColors.statusColor(level);
+    final textStyles = context.textStyles;
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
@@ -42,7 +44,7 @@ class HealthStatusBadge extends StatelessWidget {
           const SizedBox(width: 8),
           Text(
             BatteryStatusHelper.healthLabel(level),
-            style: AppTextStyles.labelLarge.copyWith(color: color),
+            style: textStyles.labelLarge.copyWith(color: color),
           ),
         ],
       ),

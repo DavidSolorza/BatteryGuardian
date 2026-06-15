@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import '../../core/theme/app_colors.dart';
-import '../../core/theme/app_text_styles.dart';
+
+import '../../core/theme/theme_extensions.dart';
 
 class EmptyState extends StatelessWidget {
   const EmptyState({
@@ -18,6 +18,9 @@ class EmptyState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
+    final textStyles = context.textStyles;
+
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(32),
@@ -28,17 +31,21 @@ class EmptyState extends StatelessWidget {
               width: 80,
               height: 80,
               decoration: BoxDecoration(
-                color: AppColors.cardElevated,
+                color: colors.cardElevated,
                 borderRadius: BorderRadius.circular(24),
               ),
-              child: Icon(icon, size: 36, color: AppColors.textSecondary),
+              child: Icon(icon, size: 36, color: colors.textSecondary),
             ),
             const SizedBox(height: 24),
-            Text(title, style: AppTextStyles.titleLarge, textAlign: TextAlign.center),
+            Text(
+              title,
+              style: textStyles.titleLarge,
+              textAlign: TextAlign.center,
+            ),
             const SizedBox(height: 8),
             Text(
               message,
-              style: AppTextStyles.bodyMedium,
+              style: textStyles.bodyMedium,
               textAlign: TextAlign.center,
             ),
             if (action != null) ...[

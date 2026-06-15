@@ -54,4 +54,8 @@ abstract final class BatteryStatusHelper {
   static bool isCharging(BatteryState state) {
     return state == BatteryState.charging || state == BatteryState.full;
   }
+
+  static bool isPluggedIn(BatteryState state) {
+    return isCharging(state) || state == BatteryState.connectedNotCharging;
+  }
 }

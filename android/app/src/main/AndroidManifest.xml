@@ -60,6 +60,14 @@
             </intent-filter>
         </receiver>
 
+        <receiver
+            android:name=".ServiceWatchdogReceiver"
+            android:exported="false" />
+
+        <receiver
+            android:name=".ServiceRestartReceiver"
+            android:exported="false" />
+
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />

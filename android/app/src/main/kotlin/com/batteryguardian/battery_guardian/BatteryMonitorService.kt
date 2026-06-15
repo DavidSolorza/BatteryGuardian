@@ -7,13 +7,18 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.os.BatteryManager
 import android.os.Build
+import android.os.Handler
 import android.os.IBinder
+import android.os.Looper
 
 class BatteryMonitorService : Service() {
     private var batteryReceiver: BroadcastReceiver? = null
+    private val handler = Handler(Looper.getMainLooper())
+    private var pollRunnable: Runnable? = null
 
     override fun onCreate() {
         super.onCreate()
+        PrefsHelper.setServiceRunning(this, true)
         NotificationHelper.createChannels(this)
         startForeground(
             NotificationHelper.NOTIFICATION_MONITORING,
@@ -21,6 +26,8 @@ class BatteryMonitorService : Service() {
         )
         registerBatteryReceiver()
         pollCurrentBatteryState()
+        startPolling()
+        ServiceWatchdog.schedule(this)
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -30,21 +37,57 @@ class BatteryMonitorService : Service() {
                 NotificationHelper.cancelAlarmNotification(this)
             }
             ACTION_STOP_SERVICE -> {
+                ServiceWatchdog.cancel(this)
                 stopSelf()
                 return START_NOT_STICKY
             }
         }
+        pollCurrentBatteryState()
         return START_STICKY
     }
 
     override fun onDestroy() {
+        pollRunnable?.let { handler.removeCallbacks(it) }
+        pollRunnable = null
+        PrefsHelper.setServiceRunning(this, false)
         batteryReceiver?.let { unregisterReceiver(it) }
         batteryReceiver = null
         AlarmHelper.stop()
+
+        if (PrefsHelper.isBackgroundMonitoringEnabled(this)) {
+            ServiceRestartReceiver.schedule(this)
+        }
         super.onDestroy()
     }
 
+    override fun onTaskRemoved(rootIntent: Intent?) {
+        if (PrefsHelper.isBackgroundMonitoringEnabled(this)) {
+            ServiceWatchdog.ensureServiceRunning(this)
+        }
+        super.onTaskRemoved(rootIntent)
+    }
+
     override fun onBind(intent: Intent?): IBinder? = null
+
+    private fun startPolling() {
+        pollRunnable?.let { handler.removeCallbacks(it) }
+        pollRunnable = object : Runnable {
+            override fun run() {
+                pollCurrentBatteryState()
+                val interval = if (PrefsHelper.isPowerSavingMode(this@BatteryMonitorService)) {
+                    120_000L
+                } else {
+                    45_000L
+                }
+                handler.postDelayed(this, interval)
+            }
+        }
+        handler.postDelayed(pollRunnable!!, pollIntervalMs())
+    }
+
+    private fun pollIntervalMs(): Long {
+        return if (PrefsHelper.isPowerSavingMode(this)) 120_000L else 45_000L
+    }
 
     private fun registerBatteryReceiver() {
         batteryReceiver = object : BroadcastReceiver() {
@@ -81,8 +124,11 @@ class BatteryMonitorService : Service() {
         val percent = if (level >= 0 && scale > 0) (level * 100) / scale else 0
 
         val status = intent.getIntExtra(BatteryManager.EXTRA_STATUS, -1)
+        val plugged = intent.getIntExtra(BatteryManager.EXTRA_PLUGGED, 0)
+        val isPluggedIn = plugged != 0
         val isCharging = status == BatteryManager.BATTERY_STATUS_CHARGING ||
-            status == BatteryManager.BATTERY_STATUS_FULL
+            status == BatteryManager.BATTERY_STATUS_FULL ||
+            (isPluggedIn && status == BatteryManager.BATTERY_STATUS_NOT_CHARGING)
 
         val temperatureRaw = intent.getIntExtra(BatteryManager.EXTRA_TEMPERATURE, -1)
         val temperature = if (temperatureRaw > 0) temperatureRaw / 10.0 else null
@@ -98,67 +144,152 @@ class BatteryMonitorService : Service() {
                     } else {
                         "Cargador conectado"
                     }
+                    val type = if (PrefsHelper.wasDisconnectedInCycle(this)) 4 else 2
                     PrefsHelper.setWasDisconnectedInCycle(this, false)
-                    NotificationHelper.showEventNotification(
-                        this,
-                        title,
-                        "Monitoreando carga desde $percent%",
-                    )
+                    val body = "Monitoreando carga desde $percent%"
+                    NotificationHelper.showEventNotification(this, title, body)
+                    EventLogger.log(this, type, body, percent)
+                    SessionLogger.onChargingStarted(this, percent, temperature)
                 } else {
                     PrefsHelper.setWasDisconnectedInCycle(this, true)
+                    val body = "Nivel actual: $percent%"
                     NotificationHelper.showEventNotification(
                         this,
                         "Cargador desconectado",
-                        "Nivel actual: $percent%",
+                        body,
                     )
+                    EventLogger.log(this, 3, body, percent)
+                    SessionLogger.onChargingStopped(this, percent, temperature)
                     AlarmHelper.stop()
                     NotificationHelper.cancelAlarmNotification(this)
-                    PrefsHelper.setLevelAlertTriggered(this, false)
-                    PrefsHelper.setTempAlertTriggered(this, false)
+                    resetChargingAlertFlags()
                 }
-            } else if (!isCharging) {
-                AlarmHelper.stop()
-                NotificationHelper.cancelAlarmNotification(this)
-                PrefsHelper.setLevelAlertTriggered(this, false)
-                PrefsHelper.setTempAlertTriggered(this, false)
+            } else {
+                if (isCharging) {
+                    SessionLogger.onChargingStarted(this, percent, temperature)
+                } else {
+                    SessionLogger.onChargingStopped(this, percent, temperature)
+                    AlarmHelper.stop()
+                    NotificationHelper.cancelAlarmNotification(this)
+                    resetChargingAlertFlags()
+                }
             }
             PrefsHelper.setWasCharging(this, isCharging)
+        } else if (isCharging) {
+            SessionLogger.sampleTemperature(temperature)
+        }
+
+        if (!isPluggedIn) {
+            PrefsHelper.setHighLevelSince(this, 0L)
+            PrefsHelper.setOverchargeAlertTriggered(this, false)
+            PrefsHelper.setFullChargeAlertTriggered(this, false)
         }
 
         val alertLevel = PrefsHelper.getAlertLevel(this)
         val levelTriggered = PrefsHelper.isLevelAlertTriggered(this)
 
-        if (isCharging && !levelTriggered && percent >= alertLevel) {
+        if (isPluggedIn && !levelTriggered && percent >= alertLevel) {
             PrefsHelper.setLevelAlertTriggered(this, true)
+            val body =
+                "Alcanzaste el $alertLevel% configurado. Desconecta el cargador para prolongar su vida útil."
             NotificationHelper.showLevelAlarmNotification(this, percent, alertLevel)
+            EventLogger.log(this, 0, body, percent)
             AlarmHelper.start(
                 this,
-                PrefsHelper.isSoundEnabled(this),
-                PrefsHelper.isVibrationEnabled(this),
+                PrefsHelper.isSoundEnabled(this) && !PrefsHelper.isQuietHoursActive(this),
+                PrefsHelper.isVibrationEnabled(this) && !PrefsHelper.isQuietHoursActive(this),
             )
         }
 
         val tempThreshold = PrefsHelper.getTempThreshold(this)
         val tempTriggered = PrefsHelper.isTempAlertTriggered(this)
         if (
-            isCharging &&
+            isPluggedIn &&
             temperature != null &&
             !tempTriggered &&
             temperature >= tempThreshold
         ) {
             PrefsHelper.setTempAlertTriggered(this, true)
+            val body =
+                "La batería alcanzó ${"%.1f".format(temperature)}°C. Deja enfriar el dispositivo."
             NotificationHelper.showAlarmNotification(
                 this,
                 "Temperatura elevada",
-                "La batería alcanzó ${"%.1f".format(temperature)}°C. Deja enfriar el dispositivo.",
+                body,
             )
+            EventLogger.log(this, 1, body, percent)
             AlarmHelper.start(
                 this,
-                PrefsHelper.isSoundEnabled(this),
-                PrefsHelper.isVibrationEnabled(this),
+                PrefsHelper.isSoundEnabled(this) && !PrefsHelper.isQuietHoursActive(this),
+                PrefsHelper.isVibrationEnabled(this) && !PrefsHelper.isQuietHoursActive(this),
             )
         } else if (temperature != null && temperature < tempThreshold - 2) {
             PrefsHelper.setTempAlertTriggered(this, false)
+        }
+
+        if (
+            PrefsHelper.isLowBatteryAlertEnabled(this) &&
+            !isPluggedIn &&
+            !PrefsHelper.isLowBatteryAlertTriggered(this) &&
+            percent <= PrefsHelper.getLowBatteryLevel(this)
+        ) {
+            PrefsHelper.setLowBatteryAlertTriggered(this, true)
+            val body = "Queda $percent% de batería. Conecta el cargador pronto."
+            NotificationHelper.showAlarmNotification(
+                this,
+                "Batería baja",
+                body,
+            )
+            EventLogger.log(this, 5, body, percent)
+            AlarmHelper.start(
+                this,
+                PrefsHelper.isSoundEnabled(this) && !PrefsHelper.isQuietHoursActive(this),
+                PrefsHelper.isVibrationEnabled(this) && !PrefsHelper.isQuietHoursActive(this),
+            )
+        } else if (percent > PrefsHelper.getLowBatteryLevel(this) + 5) {
+            PrefsHelper.setLowBatteryAlertTriggered(this, false)
+        }
+
+        if (
+            PrefsHelper.isFullChargeAlertEnabled(this) &&
+            isPluggedIn &&
+            !PrefsHelper.isFullChargeAlertTriggered(this) &&
+            percent >= 100
+        ) {
+            PrefsHelper.setFullChargeAlertTriggered(this, true)
+            val body = "La batería llegó al 100%. Puedes desconectar el cargador."
+            NotificationHelper.showEventNotification(
+                this,
+                "Carga completa",
+                body,
+            )
+            EventLogger.log(this, 6, body, percent)
+        }
+
+        if (PrefsHelper.isOverchargeAlertEnabled(this) && isPluggedIn && percent >= 95) {
+            val since = PrefsHelper.getHighLevelSince(this)
+            val highLevelSince = if (since == 0L) {
+                val now = System.currentTimeMillis()
+                PrefsHelper.setHighLevelSince(this, now)
+                now
+            } else {
+                since
+            }
+            val pluggedMinutes = ((System.currentTimeMillis() - highLevelSince) / 60000L).toInt()
+            if (pluggedMinutes >= 30 && !PrefsHelper.isOverchargeAlertTriggered(this)) {
+                PrefsHelper.setOverchargeAlertTriggered(this, true)
+                val body =
+                    "Llevas $pluggedMinutes min conectado al $percent%. Desconecta para cuidar la batería."
+                NotificationHelper.showEventNotification(
+                    this,
+                    "Carga prolongada",
+                    body,
+                )
+                EventLogger.log(this, 7, body, percent)
+            }
+        } else if (percent < 95) {
+            PrefsHelper.setHighLevelSince(this, 0L)
+            PrefsHelper.setOverchargeAlertTriggered(this, false)
         }
 
         val notification = NotificationHelper.buildMonitoringNotification(
@@ -167,6 +298,14 @@ class BatteryMonitorService : Service() {
             isCharging,
         )
         startForeground(NotificationHelper.NOTIFICATION_MONITORING, notification)
+    }
+
+    private fun resetChargingAlertFlags() {
+        PrefsHelper.setLevelAlertTriggered(this, false)
+        PrefsHelper.setTempAlertTriggered(this, false)
+        PrefsHelper.setFullChargeAlertTriggered(this, false)
+        PrefsHelper.setOverchargeAlertTriggered(this, false)
+        PrefsHelper.setHighLevelSince(this, 0L)
     }
 
     companion object {
@@ -180,9 +319,11 @@ class BatteryMonitorService : Service() {
             } else {
                 context.startService(intent)
             }
+            ServiceWatchdog.schedule(context)
         }
 
         fun stop(context: Context) {
+            ServiceWatchdog.cancel(context)
             val intent = Intent(context, BatteryMonitorService::class.java).apply {
                 action = ACTION_STOP_SERVICE
             }
@@ -190,11 +331,7 @@ class BatteryMonitorService : Service() {
         }
 
         fun isRunning(context: Context): Boolean {
-            val manager = context.getSystemService(Context.ACTIVITY_SERVICE) as android.app.ActivityManager
-            @Suppress("DEPRECATION")
-            return manager.getRunningServices(Int.MAX_VALUE).any {
-                it.service.className == BatteryMonitorService::class.java.name
-            }
+            return PrefsHelper.isServiceRunning(context)
         }
     }
 }

@@ -11,6 +11,7 @@ import android.os.Looper
 import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
+import java.io.File
 
 object AlarmHelper {
     private var mediaPlayer: MediaPlayer? = null
@@ -74,6 +75,52 @@ object AlarmHelper {
     private fun playSound(context: Context) {
         try {
             mediaPlayer?.stop()
+            mediaPlayer?.release()
+        } catch (_: Exception) {
+        }
+
+        val soundPath = PrefsHelper.getCustomSound(context)
+        mediaPlayer = MediaPlayer().apply {
+            setAudioAttributes(
+                AudioAttributes.Builder()
+                    .setUsage(AudioAttributes.USAGE_ALARM)
+                    .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                    .build(),
+            )
+            isLooping = true
+        }
+
+        try {
+            when {
+                soundPath.startsWith("local:") -> {
+                    val filePath = soundPath.removePrefix("local:")
+                    mediaPlayer?.setDataSource(filePath)
+                }
+                soundPath.startsWith("assets/") -> {
+                    val assetPath = "flutter_assets/$soundPath"
+                    val afd = context.assets.openFd(assetPath)
+                    mediaPlayer?.setDataSource(afd.fileDescriptor, afd.startOffset, afd.length)
+                    afd.close()
+                }
+                else -> {
+                    val file = File(soundPath)
+                    if (file.exists()) {
+                        mediaPlayer?.setDataSource(soundPath)
+                    } else {
+                        playDefaultSound(context)
+                        return
+                    }
+                }
+            }
+            mediaPlayer?.prepare()
+            mediaPlayer?.start()
+        } catch (_: Exception) {
+            playDefaultSound(context)
+        }
+    }
+
+    private fun playDefaultSound(context: Context) {
+        try {
             mediaPlayer?.release()
         } catch (_: Exception) {
         }

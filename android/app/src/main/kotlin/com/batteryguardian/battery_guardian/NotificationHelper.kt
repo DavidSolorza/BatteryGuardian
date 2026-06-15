@@ -9,6 +9,8 @@ import android.content.Intent
 import android.os.Build
 import androidx.core.app.NotificationCompat
 
+import com.batteryguardian.battery_guardian.R
+
 object NotificationHelper {
     const val CHANNEL_MONITORING = "battery_monitoring"
     const val CHANNEL_ALERTS = "battery_alerts"
@@ -66,7 +68,7 @@ object NotificationHelper {
         return NotificationCompat.Builder(context, CHANNEL_MONITORING)
             .setContentTitle("Battery Guardian activo")
             .setContentText("$status · Alerta al $alertLevel%")
-            .setSmallIcon(android.R.drawable.ic_lock_idle_charging)
+            .setSmallIcon(R.mipmap.ic_launcher)
             .setOngoing(true)
             .setOnlyAlertOnce(true)
             .setPriority(NotificationCompat.PRIORITY_LOW)
@@ -95,7 +97,7 @@ object NotificationHelper {
         val notification = NotificationCompat.Builder(context, CHANNEL_ALERTS)
             .setContentTitle(title)
             .setContentText(body)
-            .setSmallIcon(android.R.drawable.ic_dialog_alert)
+            .setSmallIcon(R.mipmap.ic_launcher)
             .setPriority(NotificationCompat.PRIORITY_MAX)
             .setCategory(NotificationCompat.CATEGORY_ALARM)
             .setOngoing(true)
@@ -126,7 +128,7 @@ object NotificationHelper {
         val notification = NotificationCompat.Builder(context, CHANNEL_EVENTS)
             .setContentTitle(title)
             .setContentText(body)
-            .setSmallIcon(android.R.drawable.ic_menu_info_details)
+            .setSmallIcon(R.mipmap.ic_launcher)
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)
             .setAutoCancel(true)
             .setContentIntent(openAppIntent(context))

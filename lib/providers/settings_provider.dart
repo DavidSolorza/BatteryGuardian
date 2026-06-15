@@ -26,6 +26,13 @@ class SettingsProvider extends ChangeNotifier {
       _preferences.backgroundMonitoringEnabled;
   bool get chargingNotificationsEnabled =>
       _preferences.chargingNotificationsEnabled;
+  bool get lowBatteryAlertEnabled => _preferences.lowBatteryAlertEnabled;
+  int get lowBatteryLevel => _preferences.lowBatteryLevel;
+  bool get fullChargeAlertEnabled => _preferences.fullChargeAlertEnabled;
+  bool get overchargeAlertEnabled => _preferences.overchargeAlertEnabled;
+  bool get quietHoursEnabled => _preferences.quietHoursEnabled;
+  int get quietHoursStart => _preferences.quietHoursStart;
+  int get quietHoursEnd => _preferences.quietHoursEnd;
   bool get serviceRunning => _serviceRunning;
   bool get batteryOptimizationIgnored => _batteryOptimizationIgnored;
 
@@ -75,14 +82,59 @@ class SettingsProvider extends ChangeNotifier {
     await _preferences.setBackgroundMonitoringEnabled(value);
     if (value) {
       await _backgroundMonitor.start();
+      await _backgroundMonitor.ensureRunning();
     } else {
       await _backgroundMonitor.stop();
     }
     await refreshServiceStatus();
   }
 
+  Future<void> ensureBackgroundMonitoring() async {
+    if (!_preferences.backgroundMonitoringEnabled) {
+      await refreshServiceStatus();
+      return;
+    }
+    await _backgroundMonitor.ensureRunning();
+    await refreshServiceStatus();
+  }
+
   Future<void> setChargingNotificationsEnabled(bool value) async {
     await _preferences.setChargingNotificationsEnabled(value);
+    notifyListeners();
+  }
+
+  Future<void> setLowBatteryAlertEnabled(bool value) async {
+    await _preferences.setLowBatteryAlertEnabled(value);
+    notifyListeners();
+  }
+
+  Future<void> setLowBatteryLevel(int value) async {
+    await _preferences.setLowBatteryLevel(value);
+    notifyListeners();
+  }
+
+  Future<void> setFullChargeAlertEnabled(bool value) async {
+    await _preferences.setFullChargeAlertEnabled(value);
+    notifyListeners();
+  }
+
+  Future<void> setOverchargeAlertEnabled(bool value) async {
+    await _preferences.setOverchargeAlertEnabled(value);
+    notifyListeners();
+  }
+
+  Future<void> setQuietHoursEnabled(bool value) async {
+    await _preferences.setQuietHoursEnabled(value);
+    notifyListeners();
+  }
+
+  Future<void> setQuietHoursStart(int value) async {
+    await _preferences.setQuietHoursStart(value);
+    notifyListeners();
+  }
+
+  Future<void> setQuietHoursEnd(int value) async {
+    await _preferences.setQuietHoursEnd(value);
     notifyListeners();
   }
 
@@ -94,6 +146,7 @@ class SettingsProvider extends ChangeNotifier {
   Future<void> restartBackgroundService() async {
     if (_preferences.backgroundMonitoringEnabled) {
       await _backgroundMonitor.start();
+      await _backgroundMonitor.ensureRunning();
     }
     await refreshServiceStatus();
   }

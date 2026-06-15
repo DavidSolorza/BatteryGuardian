@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../../../core/theme/app_colors.dart';
-import '../../../core/theme/app_text_styles.dart';
+import '../../../core/theme/theme_extensions.dart';
 import '../../../core/utils/date_formatter.dart';
 import '../../../core/utils/duration_formatter.dart';
 import '../../../database/sqlite/charging_session_model.dart';
@@ -14,6 +13,9 @@ class HistoryListItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
+    final textStyles = context.textStyles;
+
     return AppCard(
       padding: const EdgeInsets.all(16),
       child: Column(
@@ -24,19 +26,17 @@ class HistoryListItem extends StatelessWidget {
             children: [
               Text(
                 DateFormatter.formatDate(session.startTime),
-                style: AppTextStyles.titleMedium,
+                style: textStyles.titleMedium,
               ),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
-                  color: AppColors.primary.withValues(alpha: 0.15),
+                  color: colors.primary.withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Text(
                   DurationFormatter.format(session.duration),
-                  style: AppTextStyles.labelLarge.copyWith(
-                    color: AppColors.primary,
-                  ),
+                  style: textStyles.labelLarge.copyWith(color: colors.primary),
                 ),
               ),
             ],
@@ -88,12 +88,15 @@ class _Row extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
+    final textStyles = context.textStyles;
+
     return Row(
       children: [
-        Icon(icon, size: 16, color: AppColors.textSecondary),
+        Icon(icon, size: 16, color: colors.textSecondary),
         const SizedBox(width: 8),
-        Text('$label: ', style: AppTextStyles.bodyMedium),
-        Text(value, style: AppTextStyles.bodyLarge),
+        Text('$label: ', style: textStyles.bodyMedium),
+        Text(value, style: textStyles.bodyLarge),
       ],
     );
   }

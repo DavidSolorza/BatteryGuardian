@@ -1,8 +1,7 @@
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 
-import '../../../core/theme/app_colors.dart';
-import '../../../core/theme/app_text_styles.dart';
+import '../../../core/theme/theme_extensions.dart';
 
 class ChartWidget extends StatelessWidget {
   const ChartWidget({
@@ -10,34 +9,56 @@ class ChartWidget extends StatelessWidget {
     required this.title,
     required this.data,
     required this.labels,
-    this.barColor = AppColors.primary,
+    this.barColor,
   });
 
   final String title;
   final List<double> data;
   final List<String> labels;
-  final Color barColor;
+  final Color? barColor;
 
   @override
   Widget build(BuildContext context) {
-    final maxY = data.isEmpty
-        ? 60.0
-        : (data.reduce((a, b) => a > b ? a : b) * 1.2).clamp(10.0, double.infinity);
+    final colors = context.appColors;
+    final textStyles = context.textStyles;
+    final chartColor = barColor ?? colors.primary;
+
+    final maxValue = data.isEmpty ? 0.0 : data.reduce((a, b) => a > b ? a : b);
+    final hasData = maxValue > 0;
+    final maxY = hasData ? (maxValue * 1.2).clamp(10.0, double.infinity) : 10.0;
 
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: AppColors.card,
+        color: colors.card,
         borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: colors.cardShadow,
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(title, style: AppTextStyles.titleLarge),
+          Text(title, style: textStyles.titleLarge),
           const SizedBox(height: 24),
-          SizedBox(
-            height: 200,
-            child: BarChart(
+          if (!hasData)
+            SizedBox(
+              height: 200,
+              child: Center(
+                child: Text(
+                  'Sin datos en este periodo',
+                  style: textStyles.bodyMedium,
+                ),
+              ),
+            )
+          else
+            SizedBox(
+              height: 200,
+              child: BarChart(
               BarChartData(
                 alignment: BarChartAlignment.spaceAround,
                 maxY: maxY,
@@ -45,7 +66,7 @@ class ChartWidget extends StatelessWidget {
                   show: true,
                   drawVerticalLine: false,
                   getDrawingHorizontalLine: (value) => FlLine(
-                    color: AppColors.divider,
+                    color: colors.divider,
                     strokeWidth: 1,
                   ),
                 ),
@@ -63,7 +84,7 @@ class ChartWidget extends StatelessWidget {
                       reservedSize: 36,
                       getTitlesWidget: (value, meta) => Text(
                         '${value.toInt()}m',
-                        style: AppTextStyles.labelSmall,
+                        style: textStyles.labelSmall,
                       ),
                     ),
                   ),
@@ -79,7 +100,7 @@ class ChartWidget extends StatelessWidget {
                           padding: const EdgeInsets.only(top: 8),
                           child: Text(
                             labels[index],
-                            style: AppTextStyles.labelSmall,
+                            style: textStyles.labelSmall,
                           ),
                         );
                       },
@@ -92,7 +113,7 @@ class ChartWidget extends StatelessWidget {
                     barRods: [
                       BarChartRodData(
                         toY: data[index],
-                        color: barColor,
+                        color: chartColor,
                         width: 16,
                         borderRadius: const BorderRadius.vertical(
                           top: Radius.circular(6),
@@ -103,7 +124,7 @@ class ChartWidget extends StatelessWidget {
                 }),
               ),
             ),
-          ),
+            ),
         ],
       ),
     );

@@ -1,92 +1,135 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:google_fonts/google_fonts.dart';
-import 'app_colors.dart';
+
+import 'app_color_scheme.dart';
 import 'app_text_styles.dart';
 
 abstract final class AppTheme {
-  static ThemeData get darkTheme {
+  static ThemeData lightTheme = _buildTheme(AppColorScheme.light, Brightness.light);
+  static ThemeData darkTheme = _buildTheme(AppColorScheme.dark, Brightness.dark);
+
+  static ThemeData _buildTheme(AppColorScheme colors, Brightness brightness) {
+    final isDark = brightness == Brightness.dark;
+
     return ThemeData(
       useMaterial3: true,
-      brightness: Brightness.dark,
-      scaffoldBackgroundColor: AppColors.background,
-      colorScheme: const ColorScheme.dark(
-        surface: AppColors.background,
-        primary: AppColors.primary,
-        secondary: AppColors.primary,
-        error: AppColors.critical,
-        onSurface: AppColors.textPrimary,
-        onPrimary: AppColors.background,
+      brightness: brightness,
+      scaffoldBackgroundColor: colors.background,
+      extensions: [colors],
+      colorScheme: ColorScheme(
+        brightness: brightness,
+        primary: colors.primary,
+        onPrimary: isDark ? colors.background : Colors.white,
+        secondary: colors.primary,
+        onSecondary: isDark ? colors.background : Colors.white,
+        error: colors.critical,
+        onError: Colors.white,
+        surface: colors.card,
+        onSurface: colors.textPrimary,
       ),
       cardTheme: CardThemeData(
-        color: AppColors.card,
-        elevation: 0,
+        color: colors.card,
+        elevation: isDark ? 0 : 1,
+        shadowColor: colors.cardShadow,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(20),
         ),
         margin: EdgeInsets.zero,
       ),
       appBarTheme: AppBarTheme(
-        backgroundColor: AppColors.background,
+        backgroundColor: colors.background,
         elevation: 0,
         centerTitle: false,
-        systemOverlayStyle: SystemUiOverlayStyle.light,
-        titleTextStyle: AppTextStyles.titleLarge,
-        iconTheme: const IconThemeData(color: AppColors.textPrimary),
+        systemOverlayStyle: isDark
+            ? SystemUiOverlayStyle.light
+            : SystemUiOverlayStyle.dark,
+        titleTextStyle: AppTextStyles(colors).titleLarge,
+        iconTheme: IconThemeData(color: colors.textPrimary),
       ),
       navigationBarTheme: NavigationBarThemeData(
-        backgroundColor: AppColors.card,
-        indicatorColor: AppColors.primary.withValues(alpha: 0.15),
+        backgroundColor: colors.navBackground,
+        indicatorColor: colors.primary.withValues(alpha: 0.15),
         labelTextStyle: WidgetStateProperty.resolveWith((states) {
           final selected = states.contains(WidgetState.selected);
-          return GoogleFonts.inter(
+          return TextStyle(
+            fontFamily: 'Roboto',
             fontSize: 12,
             fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
-            color: selected ? AppColors.primary : AppColors.textSecondary,
+            color: selected ? colors.primary : colors.textSecondary,
           );
         }),
         iconTheme: WidgetStateProperty.resolveWith((states) {
           final selected = states.contains(WidgetState.selected);
           return IconThemeData(
-            color: selected ? AppColors.primary : AppColors.textSecondary,
+            color: selected ? colors.primary : colors.textSecondary,
             size: 24,
           );
         }),
         height: 72,
-        elevation: 0,
+        elevation: isDark ? 0 : 2,
+        shadowColor: colors.cardShadow,
+      ),
+      navigationRailTheme: NavigationRailThemeData(
+        backgroundColor: colors.navBackground,
+        indicatorColor: colors.primary.withValues(alpha: 0.15),
+        selectedIconTheme: IconThemeData(color: colors.primary),
+        unselectedIconTheme: IconThemeData(color: colors.textSecondary),
+        selectedLabelTextStyle: TextStyle(
+          fontFamily: 'Roboto',
+          fontSize: 12,
+          fontWeight: FontWeight.w600,
+          color: colors.primary,
+        ),
+        unselectedLabelTextStyle: TextStyle(
+          fontFamily: 'Roboto',
+          fontSize: 12,
+          fontWeight: FontWeight.w500,
+          color: colors.textSecondary,
+        ),
       ),
       switchTheme: SwitchThemeData(
         thumbColor: WidgetStateProperty.resolveWith((states) {
           if (states.contains(WidgetState.selected)) {
-            return AppColors.primary;
+            return colors.primary;
           }
-          return AppColors.textSecondary;
+          return colors.textSecondary;
         }),
         trackColor: WidgetStateProperty.resolveWith((states) {
           if (states.contains(WidgetState.selected)) {
-            return AppColors.primary.withValues(alpha: 0.3);
+            return colors.primary.withValues(alpha: 0.3);
           }
-          return AppColors.divider;
+          return colors.divider;
         }),
       ),
       sliderTheme: SliderThemeData(
-        activeTrackColor: AppColors.primary,
-        inactiveTrackColor: AppColors.divider,
-        thumbColor: AppColors.primary,
-        overlayColor: AppColors.primary.withValues(alpha: 0.2),
+        activeTrackColor: colors.primary,
+        inactiveTrackColor: colors.divider,
+        thumbColor: colors.primary,
+        overlayColor: colors.primary.withValues(alpha: 0.2),
       ),
-      dividerTheme: const DividerThemeData(
-        color: AppColors.divider,
+      dividerTheme: DividerThemeData(
+        color: colors.divider,
         thickness: 1,
       ),
-      snackBarTheme: SnackBarThemeData(
-        backgroundColor: AppColors.cardElevated,
-        contentTextStyle: AppTextStyles.bodyMedium.copyWith(
-          color: AppColors.textPrimary,
+      dropdownMenuTheme: DropdownMenuThemeData(
+        menuStyle: MenuStyle(
+          backgroundColor: WidgetStatePropertyAll(colors.card),
         ),
+      ),
+      snackBarTheme: SnackBarThemeData(
+        backgroundColor: colors.cardElevated,
+        contentTextStyle: AppTextStyles(colors).bodyMedium.copyWith(
+              color: colors.textPrimary,
+            ),
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(12),
+        ),
+      ),
+      filledButtonTheme: FilledButtonThemeData(
+        style: FilledButton.styleFrom(
+          backgroundColor: colors.primary,
+          foregroundColor: isDark ? colors.textPrimary : Colors.white,
         ),
       ),
     );

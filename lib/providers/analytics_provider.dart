@@ -1,10 +1,12 @@
 import 'package:flutter/foundation.dart';
 
+import '../core/utils/battery_health_score.dart';
 import '../database/sqlite/charging_session_model.dart';
 import '../database/sqlite/database_helper.dart';
 
 class AnalyticsData {
   const AnalyticsData({
+    this.completedSessionCount = 0,
     this.avgChargeDuration = Duration.zero,
     this.dailyChargeCount = 0,
     this.fullChargeCount = 0,
@@ -14,8 +16,12 @@ class AnalyticsData {
     this.monthlyDurations = const [],
     this.weeklyLabels = const [],
     this.monthlyLabels = const [],
+    this.levelHistory = const [],
+    this.recentSessions = const [],
+    this.careScore = 50,
   });
 
+  final int completedSessionCount;
   final Duration avgChargeDuration;
   final int dailyChargeCount;
   final int fullChargeCount;
@@ -25,6 +31,9 @@ class AnalyticsData {
   final List<double> monthlyDurations;
   final List<String> weeklyLabels;
   final List<String> monthlyLabels;
+  final List<int> levelHistory;
+  final List<ChargingSessionModel> recentSessions;
+  final int careScore;
 }
 
 class AnalyticsProvider extends ChangeNotifier {
@@ -35,11 +44,17 @@ class AnalyticsProvider extends ChangeNotifier {
 
   AnalyticsData _data = const AnalyticsData();
   bool _isLoading = true;
+  bool _hasLoaded = false;
   String? _error;
 
   AnalyticsData get data => _data;
   bool get isLoading => _isLoading;
   String? get error => _error;
+
+  Future<void> ensureLoaded() async {
+    if (_hasLoaded || _isLoading) return;
+    await loadAnalytics();
+  }
 
   Future<void> loadAnalytics() async {
     _isLoading = true;
@@ -52,6 +67,7 @@ class AnalyticsProvider extends ChangeNotifier {
           sessions.where((s) => s.isComplete).toList(growable: false);
 
       _data = _computeAnalytics(completed);
+      _hasLoaded = true;
     } catch (e) {
       _error = 'No se pudieron calcular las analíticas';
     } finally {
@@ -95,8 +111,12 @@ class AnalyticsProvider extends ChangeNotifier {
 
     final weekly = _weeklyData(sessions, now);
     final monthly = _monthlyData(sessions, now);
+    final levelHistory = _levelHistory(sessions);
+    final recent = List<ChargingSessionModel>.from(sessions)
+      ..sort((a, b) => b.startTime.compareTo(a.startTime));
 
     return AnalyticsData(
+      completedSessionCount: sessions.length,
       avgChargeDuration: avgDuration,
       dailyChargeCount: dailyCount,
       fullChargeCount: fullCount,
@@ -106,7 +126,21 @@ class AnalyticsProvider extends ChangeNotifier {
       weeklyLabels: weekly.$2,
       monthlyDurations: monthly.$1,
       monthlyLabels: monthly.$2,
+      levelHistory: levelHistory,
+      recentSessions: recent.take(5).toList(),
+      careScore: BatteryHealthScore.fromSessions(sessions),
     );
+  }
+
+  List<int> _levelHistory(List<ChargingSessionModel> sessions) {
+    final sorted = List<ChargingSessionModel>.from(sessions)
+      ..sort((a, b) => b.startTime.compareTo(a.startTime));
+    return sorted
+        .map((s) => s.endLevel ?? s.startLevel)
+        .take(10)
+        .toList()
+        .reversed
+        .toList();
   }
 
   (List<double>, List<String>) _weeklyData(
@@ -147,7 +181,7 @@ class AnalyticsProvider extends ChangeNotifier {
 
     for (var i = 3; i >= 0; i--) {
       final monthStart = DateTime(now.year, now.month - i, 1);
-      final monthEnd = DateTime(now.year, now.month - i + 1, 1);
+      final monthEnd = DateTime(monthStart.year, monthStart.month + 1, 1);
 
       final monthSessions = sessions.where(
         (s) =>
@@ -175,5 +209,8 @@ class AnalyticsProvider extends ChangeNotifier {
     return names[month - 1];
   }
 
-  Future<void> refresh() => loadAnalytics();
+  Future<void> refresh() async {
+    _hasLoaded = false;
+    return loadAnalytics();
+  }
 }

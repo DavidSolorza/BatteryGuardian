@@ -51,7 +51,8 @@ class NotificationService {
   void Function(String? payload)? onStopAlarmTapped;
 
   void _onNotificationResponse(NotificationResponse response) {
-    if (response.payload == 'stop_alarm') {
+    if (response.payload == 'stop_alarm' ||
+        response.actionId == 'stop_alarm') {
       onStopAlarmTapped?.call(response.payload);
     }
   }

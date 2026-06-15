@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import '../../core/theme/app_colors.dart';
-import '../../core/theme/app_text_styles.dart';
+
+import '../../core/theme/theme_extensions.dart';
 
 class AppCard extends StatelessWidget {
   const AppCard({
@@ -16,8 +16,10 @@ class AppCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
+
     return Material(
-      color: AppColors.card,
+      color: colors.card,
       borderRadius: BorderRadius.circular(20),
       child: InkWell(
         onTap: onTap,
@@ -28,7 +30,7 @@ class AppCard extends StatelessWidget {
             borderRadius: BorderRadius.circular(20),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withValues(alpha: 0.2),
+                color: colors.cardShadow,
                 blurRadius: 16,
                 offset: const Offset(0, 4),
               ),
@@ -55,6 +57,8 @@ class SectionHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final textStyles = context.textStyles;
+
     return Row(
       crossAxisAlignment: CrossAxisAlignment.end,
       children: [
@@ -62,10 +66,10 @@ class SectionHeader extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(title, style: AppTextStyles.headlineMedium),
+              Text(title, style: textStyles.headlineMedium),
               if (subtitle != null) ...[
                 const SizedBox(height: 4),
-                Text(subtitle!, style: AppTextStyles.bodyMedium),
+                Text(subtitle!, style: textStyles.bodyMedium),
               ],
             ],
           ),

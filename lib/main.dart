@@ -9,6 +9,7 @@ import 'core/services/background_monitor_service.dart';
 import 'core/services/notification_service.dart';
 import 'core/services/preferences_service.dart';
 import 'core/theme/app_theme.dart';
+import 'core/theme/theme_aware_system_ui.dart';
 import 'features/home/screens/home_screen.dart';
 import 'features/onboarding/screens/onboarding_screen.dart';
 import 'providers/alerts_provider.dart';
@@ -19,31 +20,24 @@ import 'providers/settings_provider.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await initializeDateFormatting('es', null);
 
   await SystemChrome.setPreferredOrientations([
     DeviceOrientation.portraitUp,
     DeviceOrientation.portraitDown,
+    DeviceOrientation.landscapeLeft,
+    DeviceOrientation.landscapeRight,
   ]);
-
-  SystemChrome.setSystemUIOverlayStyle(
-    const SystemUiOverlayStyle(
-      statusBarColor: Colors.transparent,
-      statusBarIconBrightness: Brightness.light,
-      systemNavigationBarColor: Color(0xFF1E293B),
-      systemNavigationBarIconBrightness: Brightness.light,
-    ),
-  );
 
   final preferences = await PreferencesService.create();
   final notificationService = NotificationService();
-  await notificationService.initialize();
-
   final alarmService = AlarmService();
   final backgroundMonitor = BackgroundMonitorService();
 
+  await initializeDateFormatting('es', null);
+  await notificationService.initialize();
   if (preferences.backgroundMonitoringEnabled) {
     await backgroundMonitor.start();
+    await backgroundMonitor.ensureRunning();
   }
 
   runApp(
@@ -78,7 +72,7 @@ class BatteryGuardianApp extends StatelessWidget {
           create: (_) => SettingsProvider(
             preferences,
             backgroundMonitorService: backgroundMonitor,
-          )..refreshServiceStatus(),
+          ),
         ),
         ChangeNotifierProvider(
           create: (_) => AlertsProvider(
@@ -106,9 +100,11 @@ class BatteryGuardianApp extends StatelessWidget {
           return MaterialApp(
             title: AppConstants.appName,
             debugShowCheckedModeBanner: false,
-            theme: AppTheme.darkTheme,
+            theme: AppTheme.lightTheme,
             darkTheme: AppTheme.darkTheme,
             themeMode: settings.darkTheme ? ThemeMode.dark : ThemeMode.light,
+            builder: (context, child) =>
+                ThemeAwareSystemUI(child: child ?? const SizedBox.shrink()),
             home: preferences.onboardingComplete
                 ? const HomeScreen()
                 : OnboardingScreen(preferences: preferences),

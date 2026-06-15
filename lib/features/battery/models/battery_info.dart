@@ -47,4 +47,28 @@ class BatteryInfo {
         level: 0,
         state: BatteryState.unknown,
       );
+
+  bool hasUiChangedFrom(BatteryInfo other) {
+    if (level != other.level || state != other.state) return true;
+
+    final tempA = temperature?.toStringAsFixed(1);
+    final tempB = other.temperature?.toStringAsFixed(1);
+    if (tempA != tempB) return true;
+
+    final voltA = voltage?.toStringAsFixed(2);
+    final voltB = other.voltage?.toStringAsFixed(2);
+    if (voltA != voltB) return true;
+
+    if (connectedDuration.inMinutes != other.connectedDuration.inMinutes) {
+      return true;
+    }
+
+    return false;
+  }
+
+  bool hasAlertRelevantChangeFrom(BatteryInfo other) {
+    return level != other.level ||
+        state != other.state ||
+        temperature?.round() != other.temperature?.round();
+  }
 }

@@ -71,4 +71,49 @@ class PreferencesService {
 
   Future<void> setChargingNotificationsEnabled(bool value) =>
       _prefs.setBool(AppConstants.prefChargingNotifications, value);
+
+  bool get lowBatteryAlertEnabled =>
+      _prefs.getBool(AppConstants.prefLowBatteryAlert) ?? true;
+
+  Future<void> setLowBatteryAlertEnabled(bool value) =>
+      _prefs.setBool(AppConstants.prefLowBatteryAlert, value);
+
+  int get lowBatteryLevel =>
+      _prefs.getInt(AppConstants.prefLowBatteryLevel) ??
+      AppConstants.defaultLowBatteryLevel;
+
+  Future<void> setLowBatteryLevel(int value) =>
+      _prefs.setInt(AppConstants.prefLowBatteryLevel, value);
+
+  bool get fullChargeAlertEnabled =>
+      _prefs.getBool(AppConstants.prefFullChargeAlert) ?? true;
+
+  Future<void> setFullChargeAlertEnabled(bool value) =>
+      _prefs.setBool(AppConstants.prefFullChargeAlert, value);
+
+  bool get overchargeAlertEnabled =>
+      _prefs.getBool(AppConstants.prefOverchargeAlert) ?? true;
+
+  Future<void> setOverchargeAlertEnabled(bool value) =>
+      _prefs.setBool(AppConstants.prefOverchargeAlert, value);
+
+  bool get quietHoursEnabled =>
+      _prefs.getBool(AppConstants.prefQuietHoursEnabled) ?? false;
+
+  Future<void> setQuietHoursEnabled(bool value) =>
+      _prefs.setBool(AppConstants.prefQuietHoursEnabled, value);
+
+  int get quietHoursStart =>
+      _prefs.getInt(AppConstants.prefQuietHoursStart) ??
+      AppConstants.defaultQuietHoursStart;
+
+  Future<void> setQuietHoursStart(int value) =>
+      _prefs.setInt(AppConstants.prefQuietHoursStart, value);
+
+  int get quietHoursEnd =>
+      _prefs.getInt(AppConstants.prefQuietHoursEnd) ??
+      AppConstants.defaultQuietHoursEnd;
+
+  Future<void> setQuietHoursEnd(int value) =>
+      _prefs.setInt(AppConstants.prefQuietHoursEnd, value);
 }

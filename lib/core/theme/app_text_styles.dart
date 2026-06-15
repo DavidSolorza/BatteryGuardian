@@ -1,62 +1,83 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
-import 'app_colors.dart';
 
-abstract final class AppTextStyles {
-  static TextStyle get displayLarge => GoogleFonts.inter(
+import 'app_color_scheme.dart';
+
+class AppTextStyles {
+  AppTextStyles(this._colors);
+
+  final AppColorScheme _colors;
+
+  static const String _fontFamily = 'Roboto';
+
+  static TextStyle _base({
+    required double fontSize,
+    required FontWeight fontWeight,
+    required Color color,
+    double? letterSpacing,
+  }) {
+    return TextStyle(
+      fontFamily: _fontFamily,
+      fontSize: fontSize,
+      fontWeight: fontWeight,
+      color: color,
+      letterSpacing: letterSpacing,
+    );
+  }
+
+  TextStyle get displayLarge => _base(
         fontSize: 48,
         fontWeight: FontWeight.w700,
-        color: AppColors.textPrimary,
+        color: _colors.textPrimary,
         letterSpacing: -1.5,
       );
 
-  static TextStyle get headlineLarge => GoogleFonts.inter(
+  TextStyle get headlineLarge => _base(
         fontSize: 28,
         fontWeight: FontWeight.w700,
-        color: AppColors.textPrimary,
+        color: _colors.textPrimary,
         letterSpacing: -0.5,
       );
 
-  static TextStyle get headlineMedium => GoogleFonts.inter(
+  TextStyle get headlineMedium => _base(
         fontSize: 22,
         fontWeight: FontWeight.w600,
-        color: AppColors.textPrimary,
+        color: _colors.textPrimary,
       );
 
-  static TextStyle get titleLarge => GoogleFonts.inter(
+  TextStyle get titleLarge => _base(
         fontSize: 18,
         fontWeight: FontWeight.w600,
-        color: AppColors.textPrimary,
+        color: _colors.textPrimary,
       );
 
-  static TextStyle get titleMedium => GoogleFonts.inter(
+  TextStyle get titleMedium => _base(
         fontSize: 16,
         fontWeight: FontWeight.w500,
-        color: AppColors.textPrimary,
+        color: _colors.textPrimary,
       );
 
-  static TextStyle get bodyLarge => GoogleFonts.inter(
+  TextStyle get bodyLarge => _base(
         fontSize: 16,
         fontWeight: FontWeight.w400,
-        color: AppColors.textPrimary,
+        color: _colors.textPrimary,
       );
 
-  static TextStyle get bodyMedium => GoogleFonts.inter(
+  TextStyle get bodyMedium => _base(
         fontSize: 14,
         fontWeight: FontWeight.w400,
-        color: AppColors.textSecondary,
+        color: _colors.textSecondary,
       );
 
-  static TextStyle get labelLarge => GoogleFonts.inter(
+  TextStyle get labelLarge => _base(
         fontSize: 14,
         fontWeight: FontWeight.w600,
-        color: AppColors.textPrimary,
+        color: _colors.textPrimary,
       );
 
-  static TextStyle get labelSmall => GoogleFonts.inter(
+  TextStyle get labelSmall => _base(
         fontSize: 11,
         fontWeight: FontWeight.w500,
-        color: AppColors.textSecondary,
+        color: _colors.textSecondary,
         letterSpacing: 0.5,
       );
 }

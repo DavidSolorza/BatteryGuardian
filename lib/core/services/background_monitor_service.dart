@@ -63,4 +63,26 @@ class BackgroundMonitorService {
       // Ignore on unsupported platforms.
     }
   }
+
+  Future<bool> ensureRunning() async {
+    try {
+      final result = await _channel.invokeMethod<bool>(
+        'ensureBackgroundMonitoring',
+      );
+      return result ?? false;
+    } on PlatformException {
+      return false;
+    }
+  }
+
+  Future<String> drainNativeAlertEvents() async {
+    try {
+      final result = await _channel.invokeMethod<String>(
+        'drainNativeAlertEvents',
+      );
+      return result ?? '[]';
+    } on PlatformException {
+      return '[]';
+    }
+  }
 }

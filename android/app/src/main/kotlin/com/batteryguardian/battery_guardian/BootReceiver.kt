@@ -17,6 +17,7 @@ class BootReceiver : BroadcastReceiver() {
 
         if (PrefsHelper.isBackgroundMonitoringEnabled(context)) {
             BatteryMonitorService.start(context)
+            ServiceWatchdog.schedule(context)
         }
     }
 }
