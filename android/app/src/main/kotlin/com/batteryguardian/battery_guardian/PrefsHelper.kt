@@ -186,6 +186,16 @@ object PrefsHelper {
         prefs.edit().putBoolean("was_disconnected_in_cycle", value).apply()
     }
 
+    fun getLastKnownLevel(context: Context): Int {
+        val prefs = context.getSharedPreferences(NATIVE_PREFS, Context.MODE_PRIVATE)
+        return prefs.getInt("last_known_level", -1)
+    }
+
+    fun setLastKnownLevel(context: Context, value: Int) {
+        val prefs = context.getSharedPreferences(NATIVE_PREFS, Context.MODE_PRIVATE)
+        prefs.edit().putInt("last_known_level", value).apply()
+    }
+
     fun setServiceRunning(context: Context, value: Boolean) {
         val prefs = context.getSharedPreferences(NATIVE_PREFS, Context.MODE_PRIVATE)
         prefs.edit().putBoolean("service_running", value).apply()

@@ -107,10 +107,13 @@ class AlertsProvider extends ChangeNotifier {
         final typeIndex = map['type'] as int;
         if (typeIndex < 0 || typeIndex >= AlertType.values.length) continue;
 
+        final level = map['level'] as int;
+        if (level <= 0 || level > 100) continue;
+
         final record = AlertRecord(
           type: AlertType.values[typeIndex],
           message: map['message'] as String,
-          level: map['level'] as int,
+          level: level,
           timestamp: DateTime.fromMillisecondsSinceEpoch(
             map['timestamp'] as int,
           ),

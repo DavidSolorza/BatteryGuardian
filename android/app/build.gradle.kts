@@ -4,6 +4,8 @@ plugins {
     id("dev.flutter.flutter-gradle-plugin")
 }
 
+val batteryGuardianMinSdk = 23
+
 android {
     namespace = "com.batteryguardian.battery_guardian"
     compileSdk = flutter.compileSdkVersion
@@ -21,7 +23,7 @@ android {
 
     defaultConfig {
         applicationId = "com.batteryguardian.battery_guardian"
-        minSdk = flutter.minSdkVersion
+        minSdk = batteryGuardianMinSdk
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName

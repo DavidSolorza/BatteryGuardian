@@ -121,7 +121,16 @@ class BatteryMonitorService : Service() {
     private fun handleBatteryChanged(intent: Intent) {
         val level = intent.getIntExtra(BatteryManager.EXTRA_LEVEL, -1)
         val scale = intent.getIntExtra(BatteryManager.EXTRA_SCALE, 100)
-        val percent = if (level >= 0 && scale > 0) (level * 100) / scale else 0
+        val lastKnown = PrefsHelper.getLastKnownLevel(this)
+        val percent = if (level >= 0 && scale > 0) {
+            val pct = (level * 100) / scale
+            PrefsHelper.setLastKnownLevel(this, pct)
+            pct
+        } else if (lastKnown > 0) {
+            lastKnown
+        } else {
+            0
+        }
 
         val status = intent.getIntExtra(BatteryManager.EXTRA_STATUS, -1)
         val plugged = intent.getIntExtra(BatteryManager.EXTRA_PLUGGED, 0)
@@ -230,6 +239,7 @@ class BatteryMonitorService : Service() {
         if (
             PrefsHelper.isLowBatteryAlertEnabled(this) &&
             !isPluggedIn &&
+            percent > 0 &&
             !PrefsHelper.isLowBatteryAlertTriggered(this) &&
             percent <= PrefsHelper.getLowBatteryLevel(this)
         ) {
