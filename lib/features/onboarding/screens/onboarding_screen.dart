@@ -27,21 +27,27 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   static const _infoPages = [
     _OnboardingPage(
       icon: Icons.battery_charging_full,
-      title: 'Monitoreo inteligente',
+      title: 'Dashboard',
       description:
-          'Supervisa el nivel, temperatura y voltaje de tu batería en tiempo real.',
+          'Monitorea nivel, temperatura y voltaje en tiempo real. Recibe consejos para cuidar tu batería.',
     ),
     _OnboardingPage(
       icon: Icons.notifications_active_outlined,
-      title: 'Alertas personalizadas',
+      title: 'Alertas inteligentes',
       description:
-          'Recibe avisos al alcanzar tu nivel objetivo para proteger la salud de tu batería.',
+          'Nivel objetivo, temperatura, batería baja, carga completa y sobrecarga. ¡Alarma full-screen con sonido y vibración!',
     ),
     _OnboardingPage(
       icon: Icons.analytics_outlined,
-      title: 'Estadísticas detalladas',
+      title: 'Analíticas e historial',
       description:
-          'Historial de cargas, gráficas semanales y analíticas para optimizar el uso.',
+          'Gráficas semanales/mensuales, duración de cargas y puntuación de hábitos para optimizar el uso.',
+    ),
+    _OnboardingPage(
+      icon: Icons.explore_outlined,
+      title: 'Navegación',
+      description:
+          '5 secciones: Inicio, Historial, Analíticas, Alertas y Ajustes. Desliza entre pestañas para explorar.',
     ),
   ];
 

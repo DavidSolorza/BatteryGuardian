@@ -11,10 +11,25 @@ object SessionLogger {
     private var sessionStartLevel: Int = 0
     private val temperatures = mutableListOf<Double>()
 
-    private fun openDb(context: Context): SQLiteDatabase {
-        val path = context.getDatabasePath(DB_NAME)
-        path.parentFile?.mkdirs()
-        return SQLiteDatabase.openOrCreateDatabase(path, null)
+    private fun openDb(context: Context): SQLiteDatabase? {
+        return try {
+            val path = context.getDatabasePath(DB_NAME)
+            path.parentFile?.mkdirs()
+            val db = SQLiteDatabase.openOrCreateDatabase(path, null)
+            db.execSQL(
+                "CREATE TABLE IF NOT EXISTS charging_sessions (" +
+                    "id INTEGER PRIMARY KEY AUTOINCREMENT, " +
+                    "start_time INTEGER NOT NULL, " +
+                    "end_time INTEGER, " +
+                    "start_level INTEGER NOT NULL, " +
+                    "end_level INTEGER, " +
+                    "avg_temperature REAL, " +
+                    "duration_minutes INTEGER)"
+            )
+            db
+        } catch (_: Exception) {
+            null
+        }
     }
 
     fun onChargingStarted(context: Context, level: Int, temperature: Double?) {
@@ -29,7 +44,12 @@ object SessionLogger {
             put("start_time", sessionStartMs)
             put("start_level", sessionStartLevel)
         }
-        activeSessionId = openDb(context).insert("charging_sessions", null, values)
+        val db = openDb(context) ?: return
+        try {
+            activeSessionId = db.insert("charging_sessions", null, values)
+        } catch (_: Exception) {
+            db.close()
+        }
     }
 
     fun onChargingStopped(context: Context, level: Int, temperature: Double?) {
@@ -46,12 +66,18 @@ object SessionLogger {
             put("duration_minutes", durationMinutes)
             avgTemp?.let { put("avg_temperature", it) }
         }
-        openDb(context).update(
-            "charging_sessions",
-            values,
-            "id = ?",
-            arrayOf(activeSessionId.toString()),
-        )
+        val db = openDb(context)
+        if (db != null) {
+            try {
+                db.update(
+                    "charging_sessions",
+                    values,
+                    "id = ?",
+                    arrayOf(activeSessionId.toString()),
+                )
+            } catch (_: Exception) {
+            }
+        }
 
         activeSessionId = -1L
         sessionStartMs = 0L
