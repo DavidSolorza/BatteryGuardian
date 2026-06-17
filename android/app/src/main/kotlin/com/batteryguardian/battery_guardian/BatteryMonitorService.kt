@@ -208,6 +208,7 @@ class BatteryMonitorService : Service() {
                 PrefsHelper.isSoundEnabled(this) && !PrefsHelper.isQuietHoursActive(this),
                 PrefsHelper.isVibrationEnabled(this) && !PrefsHelper.isQuietHoursActive(this),
             )
+            showAlarmActivity("¡Batería al $percent%!", body, percent)
         }
 
         val tempThreshold = PrefsHelper.getTempThreshold(this)
@@ -232,6 +233,7 @@ class BatteryMonitorService : Service() {
                 PrefsHelper.isSoundEnabled(this) && !PrefsHelper.isQuietHoursActive(this),
                 PrefsHelper.isVibrationEnabled(this) && !PrefsHelper.isQuietHoursActive(this),
             )
+            showAlarmActivity("Temperatura elevada", "La batería alcanzó ${"%.1f".format(temperature)}°C. Deja enfriar el dispositivo.", percent)
         } else if (temperature != null && temperature < tempThreshold - 2) {
             PrefsHelper.setTempAlertTriggered(this, false)
         }
@@ -256,6 +258,7 @@ class BatteryMonitorService : Service() {
                 PrefsHelper.isSoundEnabled(this) && !PrefsHelper.isQuietHoursActive(this),
                 PrefsHelper.isVibrationEnabled(this) && !PrefsHelper.isQuietHoursActive(this),
             )
+            showAlarmActivity("Batería baja", body, percent)
         } else if (percent > PrefsHelper.getLowBatteryLevel(this) + 5) {
             PrefsHelper.setLowBatteryAlertTriggered(this, false)
         }
@@ -268,12 +271,18 @@ class BatteryMonitorService : Service() {
         ) {
             PrefsHelper.setFullChargeAlertTriggered(this, true)
             val body = "La batería llegó al 100%. Puedes desconectar el cargador."
-            NotificationHelper.showEventNotification(
+            NotificationHelper.showAlarmNotification(
                 this,
                 "Carga completa",
                 body,
             )
             EventLogger.log(this, 6, body, percent)
+            AlarmHelper.start(
+                this,
+                PrefsHelper.isSoundEnabled(this) && !PrefsHelper.isQuietHoursActive(this),
+                PrefsHelper.isVibrationEnabled(this) && !PrefsHelper.isQuietHoursActive(this),
+            )
+            showAlarmActivity("Carga completa", body, percent)
         }
 
         if (PrefsHelper.isOverchargeAlertEnabled(this) && isPluggedIn && percent >= 95) {
@@ -290,12 +299,18 @@ class BatteryMonitorService : Service() {
                 PrefsHelper.setOverchargeAlertTriggered(this, true)
                 val body =
                     "Llevas $pluggedMinutes min conectado al $percent%. Desconecta para cuidar la batería."
-                NotificationHelper.showEventNotification(
+                NotificationHelper.showAlarmNotification(
                     this,
                     "Carga prolongada",
                     body,
                 )
                 EventLogger.log(this, 7, body, percent)
+                AlarmHelper.start(
+                    this,
+                    PrefsHelper.isSoundEnabled(this) && !PrefsHelper.isQuietHoursActive(this),
+                    PrefsHelper.isVibrationEnabled(this) && !PrefsHelper.isQuietHoursActive(this),
+                )
+                showAlarmActivity("Carga prolongada", body, percent)
             }
         } else if (percent < 95) {
             PrefsHelper.setHighLevelSince(this, 0L)
@@ -316,6 +331,20 @@ class BatteryMonitorService : Service() {
         PrefsHelper.setFullChargeAlertTriggered(this, false)
         PrefsHelper.setOverchargeAlertTriggered(this, false)
         PrefsHelper.setHighLevelSince(this, 0L)
+    }
+
+    private fun showAlarmActivity(title: String, body: String, level: Int) {
+        try {
+            val intent = android.content.Intent(this, AlarmActivity::class.java).apply {
+                addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK or
+                    android.content.Intent.FLAG_ACTIVITY_SINGLE_TOP)
+                putExtra(AlarmActivity.EXTRA_TITLE, title)
+                putExtra(AlarmActivity.EXTRA_BODY, body)
+                putExtra(AlarmActivity.EXTRA_LEVEL, level)
+            }
+            startActivity(intent)
+        } catch (_: Exception) {
+        }
     }
 
     companion object {

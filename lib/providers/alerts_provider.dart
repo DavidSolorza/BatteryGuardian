@@ -185,6 +185,17 @@ class AlertsProvider extends ChangeNotifier {
       _resetLevelTriggers();
     }
 
+    if (_backgroundHandlesAlerts) {
+      final nativeActive = await _backgroundMonitor.isNativeAlarmActive();
+      if (nativeActive && !_alarmActive) {
+        _alarmActive = true;
+        notifyListeners();
+      } else if (!nativeActive && _alarmActive) {
+        await stopAlarm();
+      }
+      return;
+    }
+
     await _checkLevelAlert(info);
     await _checkTemperatureAlert(info);
     await _checkLowBatteryAlert(info);

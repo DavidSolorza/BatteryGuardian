@@ -52,6 +52,9 @@ class MainActivity : FlutterActivity() {
                     "drainNativeAlertEvents" -> {
                         result.success(EventLogger.drainPending(this))
                     }
+                    "isNativeAlarmActive" -> {
+                        result.success(AlarmHelper.isActive)
+                    }
                     else -> result.notImplemented()
                 }
             }

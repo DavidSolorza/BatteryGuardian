@@ -19,7 +19,9 @@ object AlarmHelper {
     private val handler = Handler(Looper.getMainLooper())
     private var soundRunnable: Runnable? = null
     private var vibrationRunnable: Runnable? = null
-    private var isActive = false
+    @JvmStatic
+    var isActive = false
+        private set
 
     fun start(context: Context, soundEnabled: Boolean, vibrationEnabled: Boolean) {
         if (isActive) return

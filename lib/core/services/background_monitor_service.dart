@@ -85,4 +85,13 @@ class BackgroundMonitorService {
       return '[]';
     }
   }
+
+  Future<bool> isNativeAlarmActive() async {
+    try {
+      final result = await _channel.invokeMethod<bool>('isNativeAlarmActive');
+      return result ?? false;
+    } on PlatformException {
+      return false;
+    }
+  }
 }
