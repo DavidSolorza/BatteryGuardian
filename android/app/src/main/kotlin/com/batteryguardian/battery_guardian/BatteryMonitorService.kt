@@ -126,7 +126,7 @@ class BatteryMonitorService : Service() {
             val pct = (level * 100) / scale
             PrefsHelper.setLastKnownLevel(this, pct)
             pct
-        } else if (lastKnown > 0) {
+        } else if (lastKnown >= 0) {
             lastKnown
         } else {
             0

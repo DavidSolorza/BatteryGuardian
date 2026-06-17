@@ -17,6 +17,7 @@ import '../../analytics/screens/analytics_screen.dart';
 import '../../dashboard/screens/dashboard_screen.dart';
 import '../../history/screens/history_screen.dart';
 import '../../settings/screens/settings_screen.dart';
+import '../../../shared/widgets/alarm_overlay.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -218,8 +219,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           ),
         );
 
+        Widget scaffold;
         if (useRail) {
-          return Scaffold(
+          scaffold = Scaffold(
             appBar: appBar,
             body: Row(
               children: [
@@ -235,17 +237,31 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               ],
             ),
           );
+        } else {
+          scaffold = Scaffold(
+            appBar: appBar,
+            body: body,
+            bottomNavigationBar: NavigationBar(
+              selectedIndex: _currentIndex,
+              onDestinationSelected: _onTabSelected,
+              destinations: _destinations,
+            ),
+          );
         }
 
-        return Scaffold(
-          appBar: appBar,
-          body: body,
-          bottomNavigationBar: NavigationBar(
-            selectedIndex: _currentIndex,
-            onDestinationSelected: _onTabSelected,
-            destinations: _destinations,
-          ),
-        );
+        if (alerts.alarmActive) {
+          return Stack(
+            children: [
+              scaffold,
+              AlarmOverlay(
+                message: alerts.activeAlertMessage ?? 'Alarma activa',
+                onDismiss: alerts.stopAlarm,
+              ),
+            ],
+          );
+        }
+
+        return scaffold;
       },
     );
   }

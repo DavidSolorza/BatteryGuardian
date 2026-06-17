@@ -11,8 +11,8 @@ class AlarmService {
 
   final AudioPlayer _player = AudioPlayer();
   Timer? _vibrationTimer;
-  Timer? _soundTimer;
   Timer? _previewTimer;
+  Timer? _timeoutTimer;
   bool _isActive = false;
 
   bool get isActive => _isActive;
@@ -21,15 +21,13 @@ class AlarmService {
     required bool soundEnabled,
     required bool vibrationEnabled,
     String soundPath = 'sounds/alarm.wav',
+    Duration? timeout,
   }) async {
     if (_isActive) return;
     _isActive = true;
 
     if (soundEnabled) {
       await _playSound(soundPath, loop: true);
-      _soundTimer = Timer.periodic(AppConstants.alarmRepeatInterval, (_) {
-        _playSound(soundPath, loop: true);
-      });
     }
 
     if (vibrationEnabled) {
@@ -38,6 +36,8 @@ class AlarmService {
         _vibrate();
       });
     }
+
+    _timeoutTimer = Timer(timeout ?? const Duration(minutes: 10), stop);
   }
 
   Future<void> preview({
@@ -69,32 +69,41 @@ class AlarmService {
 
   Future<void> stop() async {
     _isActive = false;
-    _soundTimer?.cancel();
+    _timeoutTimer?.cancel();
+    _timeoutTimer = null;
     _vibrationTimer?.cancel();
-    _soundTimer = null;
     _vibrationTimer = null;
-    await stopPreview();
+    _previewTimer?.cancel();
+    _previewTimer = null;
+    await _player.stop();
+    await _player.setReleaseMode(ReleaseMode.release);
+    if (await Vibration.hasVibrator() == true) {
+      await Vibration.cancel();
+    }
   }
 
   Future<void> _playSound(String path, {required bool loop}) async {
     try {
+      final source = _soundSource(path);
       await _player.stop();
+      await _player.setSource(source);
       await _player.setReleaseMode(
         loop ? ReleaseMode.loop : ReleaseMode.release,
       );
-
-      if (CustomSoundService.isLocalPath(path)) {
-        final filePath = CustomSoundService.localFilePath(path);
-        await _player.play(DeviceFileSource(filePath));
-      } else {
-        final assetPath = path.startsWith('assets/')
-            ? path.replaceFirst('assets/', '')
-            : path;
-        await _player.play(AssetSource(assetPath));
-      }
+      await _player.resume();
     } catch (_) {
-      // Asset or file may be missing; alarm continues via vibration.
     }
+  }
+
+  Source _soundSource(String path) {
+    if (CustomSoundService.isLocalPath(path)) {
+      final filePath = CustomSoundService.localFilePath(path);
+      return DeviceFileSource(filePath);
+    }
+    final assetPath = path.startsWith('assets/')
+        ? path.replaceFirst('assets/', '')
+        : path;
+    return AssetSource(assetPath);
   }
 
   Future<void> _vibrate() async {

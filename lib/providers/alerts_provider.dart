@@ -185,10 +185,6 @@ class AlertsProvider extends ChangeNotifier {
       _resetLevelTriggers();
     }
 
-    if (_backgroundHandlesAlerts) {
-      return;
-    }
-
     await _checkLevelAlert(info);
     await _checkTemperatureAlert(info);
     await _checkLowBatteryAlert(info);
@@ -281,7 +277,7 @@ class AlertsProvider extends ChangeNotifier {
 
     if (info.level >= 100 && !_fullChargeTriggered) {
       _fullChargeTriggered = true;
-      await _triggerNotification(
+      await _triggerAlert(
         type: AlertType.fullCharge,
         title: 'Carga completa',
         body: 'La batería llegó al 100%. Puedes desconectar el cargador.',
@@ -305,7 +301,7 @@ class AlertsProvider extends ChangeNotifier {
           DateTime.now().difference(_highLevelSince!).inMinutes;
       if (pluggedMinutes >= 30 && !_overchargeTriggered) {
         _overchargeTriggered = true;
-        await _triggerNotification(
+        await _triggerAlert(
           type: AlertType.overcharge,
           title: 'Carga prolongada',
           body:
@@ -324,29 +320,6 @@ class AlertsProvider extends ChangeNotifier {
       soundPath: _soundPath(),
       soundEnabled: _preferences.soundEnabled,
       vibrationEnabled: _preferences.vibrationEnabled,
-    );
-  }
-
-  Future<void> _triggerNotification({
-    required AlertType type,
-    required String title,
-    required String body,
-    required int level,
-  }) async {
-    await _persistRecord(
-      AlertRecord(
-        type: type,
-        message: body,
-        timestamp: DateTime.now(),
-        level: level,
-      ),
-    );
-
-    await _notificationService.showBatteryAlert(
-      id: type.index + 100,
-      title: title,
-      body: body,
-      ongoing: false,
     );
   }
 
